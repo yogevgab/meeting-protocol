@@ -1,0 +1,120 @@
+{
+  "segments": [
+    {
+      "id": 1,
+      "start": 0.0,
+      "end": 8.5,
+      "text": "אוקי, אז בואו נתחיל. הנושא הראשון הוא האתר החדש.",
+      "speaker_id": "S1",
+      "language": "he",
+      "confidence": 0.92
+    },
+    {
+      "id": 2,
+      "start": 8.5,
+      "end": 18.0,
+      "text": "Right, we decided to launch the landing page by end of month.",
+      "speaker_id": "S2",
+      "language": "en",
+      "confidence": 0.96
+    },
+    {
+      "id": 3,
+      "start": 18.0,
+      "end": 28.0,
+      "text": "הוחלט שאנחנו עולים עם הדף עד סוף החודש.",
+      "speaker_id": "S1",
+      "language": "he",
+      "confidence": 0.91
+    },
+    {
+      "id": 4,
+      "start": 28.0,
+      "end": 40.0,
+      "text": "I'll take care of the copywriting. Follow up with the designer on the logo.",
+      "speaker_id": "S2",
+      "language": "en",
+      "confidence": 0.95
+    },
+    {
+      "id": 5,
+      "start": 40.0,
+      "end": 52.0,
+      "text": "יש לנו רעיון עסקי לגבי חבילות פרמיום. צריך לבדוק את המחירים של המתחרים.",
+      "speaker_id": "S1",
+      "language": "he",
+      "confidence": 0.90
+    },
+    {
+      "id": 6,
+      "start": 52.0,
+      "end": 64.0,
+      "text": "Business idea: we could offer a monthly subscription with unlimited transcriptions.",
+      "speaker_id": "S2",
+      "language": "en",
+      "confidence": 0.97
+    },
+    {
+      "id": 7,
+      "start": 64.0,
+      "end": 74.0,
+      "text": "אנחנו צריכים לדבר עם עוד לקוחות פוטנציאליים לפני שנחליט.",
+      "speaker_id": "S1",
+      "language": "he",
+      "confidence": 0.89
+    },
+    {
+      "id": 8,
+      "start": 74.0,
+      "end": 86.0,
+      "text": "Open question: should we focus on the Israeli market first or go global from day one?",
+      "speaker_id": "S2",
+      "language": "en",
+      "confidence": 0.96
+    },
+    {
+      "id": 9,
+      "start": 86.0,
+      "end": 96.0,
+      "text": "We could write a post about the journey of building a local-first transcription tool.",
+      "speaker_id": "S2",
+      "language": "en",
+      "confidence": 0.95
+    },
+    {
+      "id": 10,
+      "start": 96.0,
+      "end": 108.0,
+      "text": "פוסט על הכלים שאנחנו משתמשים בהם — זה תוכן טוב לבלוג.",
+      "speaker_id": "S1",
+      "language": "he",
+      "confidence": 0.91
+    },
+    {
+      "id": 11,
+      "start": 108.0,
+      "end": 118.0,
+      "text": "We agreed to meet next week and review all open items.",
+      "speaker_id": "S2",
+      "language": "en",
+      "confidence": 0.97
+    },
+    {
+      "id": 12,
+      "start": 118.0,
+      "end": 124.0,
+      "text": "מעולה. סיכמנו. נתראה שבוע הבא.",
+      "speaker_id": "S1",
+      "language": "he",
+      "confidence": 0.93
+    }
+  ],
+  "duration": 124.0,
+  "source_file": "meeting_2024-01-15.mp4",
+  "recorded_at": "2024-01-15T10:00:00",
+  "speakers": [
+    {"id": "S1", "name": "Yogev", "label": "Yogev Gabay"},
+    {"id": "S2", "name": "Tom", "label": "Tom Cohen"}
+  ],
+  "language": "mixed"
+}
