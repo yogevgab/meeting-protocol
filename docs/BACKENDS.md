@@ -24,7 +24,7 @@ meeting-protocol transcribe recording.mp3 --provider mock --out ./outputs
 
 ### WhisperCppProvider
 
-Shells out to [`whisper-cli`](https://github.com/ggerganov/whisper.cpp) (the renamed `main` binary in whisper.cpp ≥ 1.7) with `--output-json`. The runner captures stdout and parses it as JSON.
+Shells out to [`whisper-cli`](https://github.com/ggerganov/whisper.cpp) (the renamed `main` binary in whisper.cpp ≥ 1.7). The provider passes `--output-json` and `--output-file <out>/<stem>` so whisper-cli writes a JSON sidecar (`<out>/<stem>.json`) into the output directory. If stdout is empty (the common case on current builds), the provider reads the sidecar directly; if stdout contains JSON, it uses that instead.
 
 **Expected JSON format from `whisper-cli --output-json`:**
 
@@ -51,7 +51,16 @@ meeting-protocol transcribe recording.mp3 \
   --out ./outputs
 ```
 
-The binary name defaults to `whisper-cli`. If your build produces a different binary name, you can set it via the `whisper_cli` constructor argument when using the provider programmatically:
+The binary name defaults to `whisper-cli`. Override it with `--whisper-cli` on the CLI or with the `whisper_cli` constructor argument when using the provider programmatically:
+
+```bash
+# Override binary name on the CLI
+meeting-protocol transcribe recording.mp3 \
+  --provider whisper-cpp \
+  --model /path/to/ggml-medium.bin \
+  --whisper-cli /usr/local/bin/whisper-cli \
+  --out ./outputs
+```
 
 ```python
 from pathlib import Path
@@ -64,9 +73,10 @@ provider = WhisperCppProvider(
 transcript = provider.transcribe(Path("recording.mp3"))
 ```
 
+**macOS / Homebrew:** `whisper-cli` is available via `brew install whisper-cpp`. Homebrew may also install an empty `for-tests` tiny model at a path like `/opt/homebrew/Cellar/whisper-cpp/<version>/share/whisper-cpp/for-tests-ggml-tiny.bin`; this file is intentionally minimal and **not suitable for real transcription** — use it only to verify the binary works end-to-end.
+
 **Current limitations:**
 
-- The provider expects the whisper-cli command to write JSON to **stdout**. Some builds of whisper.cpp write JSON to a `.json` sidecar file instead; those are not yet supported.
 - Speaker diarization is **not implemented**. All output segments have no `speaker_id`.
 
 ### Implementing a custom transcription backend
@@ -124,6 +134,7 @@ meeting-protocol transcribe recording.mp3 \
 |---|---|---|
 | `--provider` | `mock` | Backend to use: `mock` or `whisper-cpp` |
 | `--model` | *(empty)* | Path to whisper.cpp `.bin` model file (required for `whisper-cpp`) |
+| `--whisper-cli` | `whisper-cli` | Name or path of the whisper-cli binary (`whisper-cpp` only) |
 | `--title` / `-t` | `"Meeting Protocol"` | Protocol title |
 | `--participants` / `-p` | *(empty)* | Comma-separated participant names |
 | `--out` / `-o` | `.` | Output directory (created if absent) |

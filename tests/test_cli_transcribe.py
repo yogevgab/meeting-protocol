@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from meeting_protocol.cli.main import app
@@ -180,3 +181,72 @@ def test_transcribe_exits_nonzero_when_audio_file_missing(tmp_path: Path) -> Non
     )
 
     assert result.exit_code != 0
+
+
+# ── whisper-cpp provider: binary path and output directory ────────────────────
+#
+# The CLI must accept --whisper-cli and forward both it and the --out directory
+# to WhisperCppProvider so the provider can write the sidecar JSON without
+# requiring anything on stdout.
+
+
+def test_transcribe_whisper_cpp_accepts_whisper_cli_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--whisper-cli value must be forwarded to WhisperCppProvider as whisper_cli."""
+    captured: dict[str, object] = {}
+
+    class _FakeWhisperProvider:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def transcribe(self, audio_path: Path) -> Transcript:
+            return Transcript(segments=[], duration=0.0, source_file=str(audio_path))
+
+    monkeypatch.setattr("meeting_protocol.cli.main.WhisperCppProvider", _FakeWhisperProvider)
+
+    result = runner.invoke(
+        app,
+        [
+            "transcribe",
+            str(_audio(tmp_path)),
+            "--provider", "whisper-cpp",
+            "--model", str(tmp_path / "ggml-base.bin"),
+            "--whisper-cli", "/opt/homebrew/bin/whisper-cli",
+            "--out", str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert str(captured.get("whisper_cli")) == "/opt/homebrew/bin/whisper-cli"
+
+
+def test_transcribe_whisper_cpp_passes_out_dir_to_provider_as_output_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The --out directory must be forwarded to WhisperCppProvider as output_dir."""
+    captured: dict[str, object] = {}
+
+    class _FakeWhisperProvider:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def transcribe(self, audio_path: Path) -> Transcript:
+            return Transcript(segments=[], duration=0.0, source_file=str(audio_path))
+
+    monkeypatch.setattr("meeting_protocol.cli.main.WhisperCppProvider", _FakeWhisperProvider)
+
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "transcribe",
+            str(_audio(tmp_path)),
+            "--provider", "whisper-cpp",
+            "--model", str(tmp_path / "ggml-base.bin"),
+            "--out", str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured.get("output_dir") == out_dir

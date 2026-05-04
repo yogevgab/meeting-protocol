@@ -49,11 +49,19 @@ meeting-protocol transcribe recording.mp3 \
   --out ./outputs
 
 # whisper-cpp backend (requires whisper-cli on PATH and a model file)
+# On macOS: brew install whisper-cpp  →  whisper-cli is placed on PATH
 meeting-protocol transcribe recording.mp3 \
   --provider whisper-cpp \
   --model /path/to/ggml-medium.bin \
   --title "Weekly Sync" \
   --participants "Yogev,Tom" \
+  --out ./outputs
+
+# If your binary is named differently or lives at a custom path, pass --whisper-cli:
+meeting-protocol transcribe recording.mp3 \
+  --provider whisper-cpp \
+  --model /path/to/ggml-medium.bin \
+  --whisper-cli /usr/local/bin/whisper-cli \
   --out ./outputs
 ```
 

@@ -56,6 +56,9 @@ def transcribe(
     model: Annotated[
         str, typer.Option("--model", help="Path to whisper.cpp model (whisper-cpp only).")
     ] = "",
+    whisper_cli: Annotated[
+        str, typer.Option("--whisper-cli", help="Path to whisper-cli binary (whisper-cpp only).")
+    ] = "whisper-cli",
     title: Annotated[
         str, typer.Option("--title", "-t", help="Protocol title.")
     ] = "Meeting Protocol",
@@ -75,7 +78,11 @@ def transcribe(
         if not model:
             typer.echo("Error: --model is required for whisper-cpp provider.", err=True)
             raise typer.Exit(code=1)
-        backend = WhisperCppProvider(model_path=Path(model))
+        backend = WhisperCppProvider(
+            model_path=Path(model),
+            whisper_cli=whisper_cli,
+            output_dir=out,
+        )
     else:
         typer.echo(f"Error: unknown provider {provider!r}. Choose mock or whisper-cpp.", err=True)
         raise typer.Exit(code=1)

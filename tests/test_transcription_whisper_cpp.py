@@ -204,3 +204,96 @@ def test_runner_is_called_exactly_once_per_transcribe(tmp_path: Path) -> None:
     provider.transcribe(tmp_path / "audio.wav")
 
     assert call_count[0] == 1
+
+
+# ── whisper.cpp 1.8.x sidecar-file behavior ──────────────────────────────────
+#
+# whisper-cli --output-json --output-file <base> writes JSON to <base>.json;
+# stdout is typically empty. The provider must emit the right flags and then
+# fall back to reading the sidecar file when stdout is empty.
+
+
+def test_build_command_includes_output_file_flag_when_output_dir_configured(
+    tmp_path: Path,
+) -> None:
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        output_dir=tmp_path / "out",
+        runner=_fixed_runner(""),
+    )
+    cmd = provider._build_command(tmp_path / "meeting.wav")
+
+    assert "--output-file" in cmd
+
+
+def test_build_command_output_file_value_is_audio_stem_inside_output_dir(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "out"
+    audio = tmp_path / "meeting.wav"
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        output_dir=output_dir,
+        runner=_fixed_runner(""),
+    )
+    cmd = provider._build_command(audio)
+
+    idx = cmd.index("--output-file")
+    assert cmd[idx + 1] == str(output_dir / audio.stem)
+
+
+def test_transcribe_reads_json_from_sidecar_file_when_stdout_is_empty(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    audio = tmp_path / "meeting.wav"
+    audio.touch()
+    (output_dir / "meeting.json").write_text(_SAMPLE_OUTPUT, encoding="utf-8")
+
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        output_dir=output_dir,
+        runner=_fixed_runner(""),
+    )
+    transcript = provider.transcribe(audio)
+
+    assert len(transcript.segments) == 2
+
+
+def test_empty_transcription_list_yields_zero_segments(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    audio = tmp_path / "silence.wav"
+    audio.touch()
+    (output_dir / "silence.json").write_text(
+        json.dumps({"transcription": []}), encoding="utf-8"
+    )
+
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        output_dir=output_dir,
+        runner=_fixed_runner(""),
+    )
+    transcript = provider.transcribe(audio)
+
+    assert transcript.segments == []
+
+
+def test_empty_transcription_list_yields_duration_zero(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    audio = tmp_path / "silence.wav"
+    audio.touch()
+    (output_dir / "silence.json").write_text(
+        json.dumps({"transcription": []}), encoding="utf-8"
+    )
+
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        output_dir=output_dir,
+        runner=_fixed_runner(""),
+    )
+    transcript = provider.transcribe(audio)
+
+    assert transcript.duration == 0.0
