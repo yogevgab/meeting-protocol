@@ -76,7 +76,21 @@ class PyannoteDiarizer(Diarizer):
             kwargs["min_speakers"] = self._min_speakers
         if self._max_speakers is not None:
             kwargs["max_speakers"] = self._max_speakers
-        annotation = pipeline(str(audio_path), **kwargs)
+        result = pipeline(str(audio_path), **kwargs)
+
+        # pyannote.audio ≥ 4.0 wraps the output in a DiarizeOutput object;
+        # older versions return an Annotation directly.
+        if hasattr(result, "itertracks"):
+            annotation = result
+        elif (
+            hasattr(result, "exclusive_speaker_diarization")
+            and result.exclusive_speaker_diarization is not None
+        ):
+            annotation = result.exclusive_speaker_diarization
+        elif hasattr(result, "speaker_diarization"):
+            annotation = result.speaker_diarization
+        else:
+            raise RuntimeError(f"Unexpected pipeline output type: {type(result)}")
 
         intervals: list[SpeakerInterval] = []
         for turn, _track, label in annotation.itertracks(yield_label=True):

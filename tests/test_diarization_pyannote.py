@@ -19,6 +19,14 @@ class _StubTurn:
     end: float
 
 
+@dataclass
+class _StubDiarizeOutput:
+    """Mimics pyannote.audio ≥ 4.0 DiarizeOutput — has no itertracks itself."""
+
+    speaker_diarization: Any
+    exclusive_speaker_diarization: Any = None
+
+
 class _StubAnnotation:
     """Stands in for a pyannote Annotation. Its itertracks(yield_label=True)
     yields (turn, track_id, label) triples — same shape as the real thing."""
@@ -247,3 +255,68 @@ def test_default_pipeline_factory_calls_from_pretrained_with_token_not_use_auth_
         _default_pipeline_factory("my/model", "my-token")
 
     pipeline_cls.from_pretrained.assert_called_once_with("my/model", token="my-token")
+
+
+# ── pyannote.audio ≥ 4.0 DiarizeOutput support ───────────────────────────────
+
+
+def test_diarize_with_diarize_output_uses_speaker_diarization(tmp_path: Path) -> None:
+    """Pipeline returning DiarizeOutput should unwrap speaker_diarization."""
+    inner = _StubAnnotation(
+        [
+            (_StubTurn(1.0, 3.0), "t1", "SPEAKER_00"),
+            (_StubTurn(4.0, 7.0), "t2", "SPEAKER_01"),
+        ]
+    )
+    output = _StubDiarizeOutput(speaker_diarization=inner)
+
+    class _WrappedPipeline:
+        calls: list[tuple[str, dict[str, int]]] = []
+
+        def __call__(self, audio_path: str, **kwargs: int) -> _StubDiarizeOutput:
+            self.calls.append((audio_path, dict(kwargs)))
+            return output
+
+    wrapped = _WrappedPipeline()
+
+    def factory(model: str, auth_token: str | None) -> _WrappedPipeline:
+        return wrapped
+
+    d = PyannoteDiarizer(auth_token="t", pipeline_factory=factory)
+    intervals = d.diarize(tmp_path / "audio.wav")
+
+    assert [(i.start, i.end, i.label) for i in intervals] == [
+        (1.0, 3.0, "SPEAKER_00"),
+        (4.0, 7.0, "SPEAKER_01"),
+    ]
+
+
+def test_diarize_prefers_exclusive_speaker_diarization_when_set(tmp_path: Path) -> None:
+    """exclusive_speaker_diarization takes precedence over speaker_diarization."""
+    regular = _StubAnnotation(
+        [(_StubTurn(0.0, 5.0), "t1", "SPEAKER_00")]
+    )
+    exclusive = _StubAnnotation(
+        [
+            (_StubTurn(0.0, 2.5), "t1", "SPEAKER_00"),
+            (_StubTurn(2.5, 5.0), "t2", "SPEAKER_01"),
+        ]
+    )
+    output = _StubDiarizeOutput(
+        speaker_diarization=regular,
+        exclusive_speaker_diarization=exclusive,
+    )
+
+    def factory(model: str, auth_token: str | None) -> Any:
+        def pipeline(audio_path: str, **kwargs: int) -> _StubDiarizeOutput:
+            return output
+
+        return pipeline
+
+    d = PyannoteDiarizer(auth_token="t", pipeline_factory=factory)
+    intervals = d.diarize(tmp_path / "audio.wav")
+
+    assert [(i.start, i.end, i.label) for i in intervals] == [
+        (0.0, 2.5, "SPEAKER_00"),
+        (2.5, 5.0, "SPEAKER_01"),
+    ]
