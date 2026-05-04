@@ -107,7 +107,7 @@ hf download ivrit-ai/whisper-large-v3-turbo-ggml \
   --local-dir ~/.cache/whisper-models/ivrit-large-v3-turbo
 ```
 
-**Transcribe a Hebrew meeting:** whisper.cpp supports WAV/MP3/FLAC/OGG. If your recorder produces M4A, convert it first with `ffmpeg -i recording.m4a -ar 16000 -ac 1 recording.wav`.
+**Transcribe a Hebrew meeting:** whisper.cpp works best with WAV, but the CLI automatically normalizes common recorder formats such as M4A/MP3/AAC to temporary mono 16 kHz WAV files when `ffmpeg` is available.
 
 ```bash
 meeting-protocol transcribe recording.wav \
