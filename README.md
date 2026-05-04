@@ -36,7 +36,41 @@ pip install -e ".[faster-whisper]"
 
 ## Quickstart
 
-### Generate a protocol from a JSON transcript
+### Transcribe audio and generate a protocol
+
+Use the `transcribe` command to go straight from an audio file to a full protocol:
+
+```bash
+# Mock backend (no hardware required — useful for testing and CI)
+meeting-protocol transcribe recording.mp3 \
+  --provider mock \
+  --title "Weekly Sync" \
+  --participants "Yogev,Tom" \
+  --out ./outputs
+
+# whisper-cpp backend (requires whisper-cli on PATH and a model file)
+meeting-protocol transcribe recording.mp3 \
+  --provider whisper-cpp \
+  --model /path/to/ggml-medium.bin \
+  --title "Weekly Sync" \
+  --participants "Yogev,Tom" \
+  --out ./outputs
+```
+
+This writes four files to `./outputs/`:
+
+| File | Contents |
+|---|---|
+| `transcript.json` | Raw transcript in the internal JSON format |
+| `protocol.md` | Full protocol with decisions, actions, ideas, open questions |
+| `transcript.md` | Speaker-labelled transcript with timestamps |
+| `actions.md` | Standalone action items checklist |
+
+> **Current limitations:** Diarization is not yet implemented. The `mock` backend returns two fixed speakers (`S1=Yogev`, `S2=Tom`). The `whisper-cpp` backend produces segments with no speaker labels — all segments are left without a `speaker_id` until a diarization step is added.
+
+### Generate a protocol from an existing JSON transcript
+
+If you already have a transcript in the internal format:
 
 ```bash
 meeting-protocol from-transcript recording.json \
@@ -45,13 +79,7 @@ meeting-protocol from-transcript recording.json \
   --out ./outputs
 ```
 
-This writes three files to `./outputs/`:
-
-| File | Contents |
-|---|---|
-| `protocol.md` | Full protocol with decisions, actions, ideas, open questions |
-| `transcript.md` | Speaker-labelled transcript with timestamps |
-| `actions.md` | Standalone action items checklist |
+This writes `protocol.md`, `transcript.md`, and `actions.md` (no `transcript.json` — the source file is used as-is).
 
 ### Check the installed version
 
@@ -88,9 +116,12 @@ meeting-protocol/
 │   ├── outputs/
 │   │   └── markdown.py    # Markdown renderers: render_protocol, render_transcript, render_actions
 │   ├── cli/
-│   │   └── main.py        # Typer CLI: version, from-transcript
-│   ├── transcription/     # Backend adapters (pluggable)
-│   └── diarization/       # Backend adapters (pluggable)
+│   │   └── main.py        # Typer CLI: version, from-transcript, transcribe
+│   ├── transcription/
+│   │   ├── base.py        # TranscriptionProvider ABC
+│   │   ├── mock.py        # MockTranscriptionProvider — fixed fixture segments, no hardware
+│   │   └── whisper_cpp.py # WhisperCppProvider — shells out to whisper-cli, parses JSON output
+│   └── diarization/       # Backend adapters (pluggable, not yet implemented)
 ├── fixtures/
 │   └── sample_transcript.json
 └── tests/
@@ -99,15 +130,17 @@ meeting-protocol/
 **Data flow:**
 
 ```
-JSON file → load_transcript() → Transcript
-                                    ↓
-                           generate_protocol()
-                                    ↓
-                               Protocol
-                                    ↓
-        render_protocol() / render_transcript() / render_actions()
-                                    ↓
-                          Obsidian Markdown files
+Audio file → TranscriptionProvider.transcribe() → Transcript → save_transcript() → transcript.json
+                                                       ↓
+JSON file  → load_transcript()              → Transcript
+                                                       ↓
+                                              generate_protocol()
+                                                       ↓
+                                                   Protocol
+                                                       ↓
+                   render_protocol() / render_transcript() / render_actions()
+                                                       ↓
+                                          Obsidian Markdown files
 ```
 
 See [docs/BACKENDS.md](docs/BACKENDS.md) for the transcription and diarization backend roadmap.
