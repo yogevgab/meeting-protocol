@@ -75,9 +75,52 @@ transcript = provider.transcribe(Path("recording.mp3"))
 
 **macOS / Homebrew:** `whisper-cli` is available via `brew install whisper-cpp`. Homebrew may also install an empty `for-tests` tiny model at a path like `/opt/homebrew/Cellar/whisper-cpp/<version>/share/whisper-cpp/for-tests-ggml-tiny.bin`; this file is intentionally minimal and **not suitable for real transcription** — use it only to verify the binary works end-to-end.
 
+**stdout handling:** The provider first checks for a JSON sidecar written by `--output-json`; if stdout is non-empty it also accepts raw JSON there. This matches the behavior of whisper-cli ≥ 1.7 where the JSON is written to the sidecar file and stdout may contain progress or timing lines instead.
+
 **Current limitations:**
 
 - Speaker diarization is **not implemented**. All output segments have no `speaker_id`.
+
+### Hebrew transcription — Ivrit model
+
+For high-quality transcription of Hebrew (and Hebrew/English mixed) audio, use the **[ivrit-ai/whisper-large-v3-turbo-ggml](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml)** model. This is an Ivrit-AI fine-tune of Whisper large-v3-turbo distributed as a GGML binary compatible with whisper.cpp / whisper-cli.
+
+**Download the model to a user-local directory outside the repo** (models are large — do not commit them):
+
+```bash
+# Install huggingface-hub CLI once if not already available
+pip install huggingface-hub
+
+# Download the model to a shared cache directory
+hf download ivrit-ai/whisper-large-v3-turbo-ggml \
+  --local-dir ~/.cache/whisper-models/ivrit-large-v3-turbo
+```
+
+The main model file will be at `~/.cache/whisper-models/ivrit-large-v3-turbo/ggml-model.bin` (or similar; check the directory contents after download).
+
+**Run transcription with Hebrew language specified:** whisper.cpp supports WAV/MP3/FLAC/OGG. If your recorder produces M4A, convert it first with `ffmpeg -i recording.m4a -ar 16000 -ac 1 recording.wav`.
+
+```bash
+meeting-protocol transcribe recording.wav \
+  --provider whisper-cpp \
+  --model ~/.cache/whisper-models/ivrit-large-v3-turbo/ggml-model.bin \
+  --language he \
+  --title "Meeting" \
+  --participants "Yogev,Tom" \
+  --out ./outputs
+```
+
+> **`--language` flag:** Defaults to `auto` (whisper.cpp language detection). For Hebrew recordings, **always pass `--language he`** — language detection can mis-classify Hebrew as another language, which degrades accuracy significantly. Mixed Hebrew/English meetings still benefit from `he` because the model handles code-switching well.
+
+**Observed smoke test (local, macOS, whisper-cli 1.8.3):**
+
+- Audio: 6.8 s synthetic Hebrew speech generated with `say -v Carmit`
+- Model: `ivrit-ai/whisper-large-v3-turbo-ggml`
+- Transcription time: ~2–3 seconds on an M-series Mac
+- Result: Hebrew transcript produced correctly
+- Known TTS artefact: `say -v Carmit` mispronounces עסק as *אִיסָק* — the transcript reflected the TTS audio faithfully rather than the intended word. This is a synthetic-audio limitation; **real meeting recordings still require evaluation**.
+
+> **Model size note:** GGML large-v3-turbo is approximately 1.6 GB. Store models in `~/.cache/whisper-models/` or another directory outside the repository. The `.gitignore` already excludes `*.bin` files, but be careful not to commit model weights.
 
 ### Implementing a custom transcription backend
 
@@ -135,6 +178,7 @@ meeting-protocol transcribe recording.mp3 \
 | `--provider` | `mock` | Backend to use: `mock` or `whisper-cpp` |
 | `--model` | *(empty)* | Path to whisper.cpp `.bin` model file (required for `whisper-cpp`) |
 | `--whisper-cli` | `whisper-cli` | Name or path of the whisper-cli binary (`whisper-cpp` only) |
+| `--language` | `auto` | Language code passed to whisper-cli (e.g. `he`, `en`). Use `he` for Hebrew recordings; `auto` relies on whisper.cpp language detection which can mis-classify Hebrew |
 | `--title` / `-t` | `"Meeting Protocol"` | Protocol title |
 | `--participants` / `-p` | *(empty)* | Comma-separated participant names |
 | `--out` / `-o` | `.` | Output directory (created if absent) |

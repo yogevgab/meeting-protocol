@@ -221,6 +221,67 @@ def test_transcribe_whisper_cpp_accepts_whisper_cli_option(
     assert str(captured.get("whisper_cli")) == "/opt/homebrew/bin/whisper-cli"
 
 
+def test_transcribe_whisper_cpp_accepts_language_option_and_forwards_to_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--language he must be forwarded to WhisperCppProvider as language='he'."""
+    captured: dict[str, object] = {}
+
+    class _FakeWhisperProvider:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def transcribe(self, audio_path: Path) -> Transcript:
+            return Transcript(segments=[], duration=0.0, source_file=str(audio_path))
+
+    monkeypatch.setattr("meeting_protocol.cli.main.WhisperCppProvider", _FakeWhisperProvider)
+
+    result = runner.invoke(
+        app,
+        [
+            "transcribe",
+            str(_audio(tmp_path)),
+            "--provider", "whisper-cpp",
+            "--model", str(tmp_path / "ggml-base.bin"),
+            "--language", "he",
+            "--out", str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured.get("language") == "he"
+
+
+def test_transcribe_whisper_cpp_default_language_is_auto(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When --language is omitted, WhisperCppProvider must receive language='auto'."""
+    captured: dict[str, object] = {}
+
+    class _FakeWhisperProvider:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def transcribe(self, audio_path: Path) -> Transcript:
+            return Transcript(segments=[], duration=0.0, source_file=str(audio_path))
+
+    monkeypatch.setattr("meeting_protocol.cli.main.WhisperCppProvider", _FakeWhisperProvider)
+
+    result = runner.invoke(
+        app,
+        [
+            "transcribe",
+            str(_audio(tmp_path)),
+            "--provider", "whisper-cpp",
+            "--model", str(tmp_path / "ggml-base.bin"),
+            "--out", str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured.get("language") == "auto"
+
+
 def test_transcribe_whisper_cpp_passes_out_dir_to_provider_as_output_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

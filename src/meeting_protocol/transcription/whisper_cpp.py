@@ -18,11 +18,13 @@ class WhisperCppProvider(TranscriptionProvider):
         self,
         model_path: Path,
         whisper_cli: str = "whisper-cli",
+        language: str = "auto",
         output_dir: Path | None = None,
         runner: SubprocessRunner | None = None,
     ) -> None:
         self._model_path = model_path
         self._whisper_cli = whisper_cli
+        self._language = language
         self._output_dir = output_dir
         self._runner: SubprocessRunner = runner if runner is not None else _default_runner
 
@@ -31,6 +33,7 @@ class WhisperCppProvider(TranscriptionProvider):
             self._whisper_cli,
             "--model", str(self._model_path),
             "--output-json",
+            "--language", self._language,
         ]
         if self._output_dir is not None:
             cmd += ["--output-file", str(self._output_dir / audio_path.stem)]
@@ -40,9 +43,16 @@ class WhisperCppProvider(TranscriptionProvider):
     def transcribe(self, audio_path: Path) -> Transcript:
         cmd = self._build_command(audio_path)
         output = self._runner(cmd)
-        if not output.strip() and self._output_dir is not None:
+        if self._output_dir is not None:
             sidecar = self._output_dir / f"{audio_path.stem}.json"
-            output = sidecar.read_text(encoding="utf-8")
+            use_sidecar = not output.strip()
+            if not use_sidecar:
+                try:
+                    json.loads(output)
+                except (json.JSONDecodeError, ValueError):
+                    use_sidecar = True
+            if use_sidecar and sidecar.exists():
+                output = sidecar.read_text(encoding="utf-8")
         data = json.loads(output)
         segments: list[Segment] = []
         for i, raw in enumerate(data["transcription"], start=1):

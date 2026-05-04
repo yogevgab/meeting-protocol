@@ -59,6 +59,9 @@ def transcribe(
     whisper_cli: Annotated[
         str, typer.Option("--whisper-cli", help="Path to whisper-cli binary (whisper-cpp only).")
     ] = "whisper-cli",
+    language: Annotated[
+        str, typer.Option("--language", help="Language code for transcription (whisper-cpp only).")
+    ] = "auto",
     title: Annotated[
         str, typer.Option("--title", "-t", help="Protocol title.")
     ] = "Meeting Protocol",
@@ -81,6 +84,7 @@ def transcribe(
         backend = WhisperCppProvider(
             model_path=Path(model),
             whisper_cli=whisper_cli,
+            language=language,
             output_dir=out,
         )
     else:

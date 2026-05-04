@@ -65,6 +65,34 @@ meeting-protocol transcribe recording.mp3 \
   --out ./outputs
 ```
 
+### Hebrew transcription (Ivrit model)
+
+For Hebrew or Hebrew/English mixed recordings, use the **ivrit-ai/whisper-large-v3-turbo-ggml** model and pass `--language he`. The `--language` flag defaults to `auto` (whisper.cpp language detection), but language detection can mis-classify Hebrew — always specify it explicitly for Hebrew recordings.
+
+**Download the model once to a local cache directory** (models are large; do not store them inside the repo):
+
+```bash
+pip install huggingface-hub   # one-time
+hf download ivrit-ai/whisper-large-v3-turbo-ggml \
+  --local-dir ~/.cache/whisper-models/ivrit-large-v3-turbo
+```
+
+**Transcribe a Hebrew meeting:** whisper.cpp supports WAV/MP3/FLAC/OGG. If your recorder produces M4A, convert it first with `ffmpeg -i recording.m4a -ar 16000 -ac 1 recording.wav`.
+
+```bash
+meeting-protocol transcribe recording.wav \
+  --provider whisper-cpp \
+  --model ~/.cache/whisper-models/ivrit-large-v3-turbo/ggml-model.bin \
+  --language he \
+  --title "פגישה שבועית" \
+  --participants "Yogev,Tom" \
+  --out ./outputs
+```
+
+**Observed local smoke test (macOS, whisper-cli 1.8.3):** 6.8 s of synthetic Hebrew speech (`say -v Carmit`) was transcribed to Hebrew in ~2–3 seconds using the Ivrit large-v3-turbo model. The transcript was correct; a minor TTS artefact (the voice rendered עסק as *אִיסָק*) appeared faithfully in the output — this is a synthetic-audio limitation, not a model bug. Real meeting recordings still need evaluation.
+
+> See [docs/BACKENDS.md](docs/BACKENDS.md) for full backend details, model download instructions, and the `--language` option reference.
+
 This writes four files to `./outputs/`:
 
 | File | Contents |

@@ -78,6 +78,30 @@ def test_build_command_path_with_spaces_is_single_element(tmp_path: Path) -> Non
     assert not any(";" in arg or "|" in arg or "&&" in arg for arg in cmd)
 
 
+def test_build_command_includes_language_flag_for_hebrew(tmp_path: Path) -> None:
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        language="he",
+        runner=_fixed_runner(""),
+    )
+    cmd = provider._build_command(tmp_path / "audio.wav")
+
+    assert "--language" in cmd
+    assert cmd[cmd.index("--language") + 1] == "he"
+
+
+def test_build_command_includes_language_flag_for_auto(tmp_path: Path) -> None:
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        language="auto",
+        runner=_fixed_runner(""),
+    )
+    cmd = provider._build_command(tmp_path / "audio.wav")
+
+    assert "--language" in cmd
+    assert cmd[cmd.index("--language") + 1] == "auto"
+
+
 def test_build_command_uses_configured_whisper_cli_binary(tmp_path: Path) -> None:
     model = tmp_path / "ggml-base.bin"
     provider = WhisperCppProvider(
@@ -255,6 +279,26 @@ def test_transcribe_reads_json_from_sidecar_file_when_stdout_is_empty(
         model_path=tmp_path / "ggml-base.bin",
         output_dir=output_dir,
         runner=_fixed_runner(""),
+    )
+    transcript = provider.transcribe(audio)
+
+    assert len(transcript.segments) == 2
+
+
+def test_transcribe_reads_sidecar_when_stdout_contains_non_json_text(
+    tmp_path: Path,
+) -> None:
+    """Ivrit whisper-cli can emit plain transcript text while writing JSON sidecar."""
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    audio = tmp_path / "meeting.wav"
+    audio.touch()
+    (output_dir / "meeting.json").write_text(_SAMPLE_OUTPUT, encoding="utf-8")
+
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        output_dir=output_dir,
+        runner=_fixed_runner("Hello, this is a test.\nשלום, זה בדיקה.\n"),
     )
     transcript = provider.transcribe(audio)
 
