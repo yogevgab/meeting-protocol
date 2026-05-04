@@ -81,22 +81,19 @@ meeting-protocol transcribe part1.m4a part2.m4a part3.m4a \
 
 Files are processed in the order given. Timestamps from each subsequent file are offset so the full timeline is continuous — the result is a single merged transcript as if it were one recording. The usual four output files (`transcript.json`, `protocol.md`, `transcript.md`, `actions.md`) are produced for the combined session.
 
-**Current limitation — diarization with multiple files is not yet supported.** If you pass `--diarize` together with multiple audio files the command will exit with an error. Workaround: concatenate the files into one before running:
+You can also use diarization with multiple files directly:
 
 ```bash
-ffmpeg -i "concat:part1.m4a|part2.m4a|part3.m4a" -c copy combined.m4a
-meeting-protocol transcribe combined.m4a --diarize ...
+meeting-protocol transcribe part1.m4a part2.m4a part3.m4a \
+  --provider whisper-cpp \
+  --model ~/.cache/whisper-models/ivrit-large-v3-turbo/ggml-model.bin \
+  --language he \
+  --diarize \
+  --num-speakers 2 \
+  --out ./outputs
 ```
 
-Or convert each part to WAV and join them:
-
-```bash
-for f in part1.m4a part2.m4a part3.m4a; do
-  ffmpeg -i "$f" -ar 16000 -ac 1 "${f%.m4a}.wav"
-done
-sox part1.wav part2.wav part3.wav combined.wav
-meeting-protocol transcribe combined.wav --diarize ...
-```
+Internally, the CLI creates a temporary continuous mono 16 kHz WAV for pyannote, runs diarization on that combined timeline, assigns speakers to the merged transcript, and cleans up the temporary audio.
 
 ### Hebrew transcription (Ivrit model)
 

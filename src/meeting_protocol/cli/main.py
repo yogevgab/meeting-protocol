@@ -1,3 +1,4 @@
+import tempfile
 from dataclasses import replace as dc_replace
 from pathlib import Path
 from typing import Annotated
@@ -5,6 +6,7 @@ from typing import Annotated
 import typer
 
 from meeting_protocol import __version__
+from meeting_protocol.audio.concat import concat_audio_files
 from meeting_protocol.correction.ollama import OllamaCorrector
 from meeting_protocol.diarization.assignment import assign_speakers
 from meeting_protocol.diarization.base import Diarizer
@@ -219,27 +221,45 @@ def transcribe(
     participant_list = [p.strip() for p in participants.split(",") if p.strip()]
 
     if diarize:
-        if len(audio_paths) > 1:
-            typer.echo("Error: --diarize is not supported with multiple audio files yet.", err=True)
-            raise typer.Exit(code=1)
+        # When multiple files are given, concatenate them into a single temp file
+        # so the diarizer sees one continuous audio timeline.
+        _tmp: tempfile.TemporaryDirectory[str] | None = None
         try:
-            speaker_map_dict = parse_speaker_map(speaker_map)
-        except ValueError as e:
-            typer.echo(f"Error: invalid --speaker-map: {e}", err=True)
-            raise typer.Exit(code=1) from None
-        diarizer_obj = _build_diarizer(
-            name=diarizer,
-            hf_token=hf_token,
-            num_speakers=num_speakers,
-            min_speakers=min_speakers,
-            max_speakers=max_speakers,
-            participants=participant_list,
-        )
-        try:
-            intervals = diarizer_obj.diarize(audio_paths[0])
-        except (RuntimeError, ImportError) as e:
-            typer.echo(f"Error: diarization failed: {e}", err=True)
-            raise typer.Exit(code=1) from None
+            if len(audio_paths) > 1:
+                _tmp = tempfile.TemporaryDirectory()
+                _concat_path = Path(_tmp.name) / "merged_audio.wav"
+                try:
+                    concat_audio_files(audio_paths, _concat_path)
+                except RuntimeError as e:
+                    typer.echo(f"Error: audio concatenation failed: {e}", err=True)
+                    raise typer.Exit(code=1) from None
+                diarize_audio_path: Path = _concat_path
+            else:
+                diarize_audio_path = audio_paths[0]
+
+            try:
+                speaker_map_dict = parse_speaker_map(speaker_map)
+            except ValueError as e:
+                typer.echo(f"Error: invalid --speaker-map: {e}", err=True)
+                raise typer.Exit(code=1) from None
+
+            diarizer_obj = _build_diarizer(
+                name=diarizer,
+                hf_token=hf_token,
+                num_speakers=num_speakers,
+                min_speakers=min_speakers,
+                max_speakers=max_speakers,
+                participants=participant_list,
+            )
+            try:
+                intervals = diarizer_obj.diarize(diarize_audio_path)
+            except (RuntimeError, ImportError) as e:
+                typer.echo(f"Error: diarization failed: {e}", err=True)
+                raise typer.Exit(code=1) from None
+        finally:
+            if _tmp is not None:
+                _tmp.cleanup()
+
         new_segs, speakers = assign_speakers(
             transcript.segments, intervals, speaker_map=speaker_map_dict
         )
