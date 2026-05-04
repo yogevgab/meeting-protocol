@@ -324,6 +324,27 @@ def test_empty_transcription_list_yields_zero_segments(tmp_path: Path) -> None:
     assert transcript.segments == []
 
 
+def test_transcribe_accepts_raw_control_chars_in_segment_text(tmp_path: Path) -> None:
+    """whisper-cli sometimes embeds raw newlines inside "text" values, producing
+    JSON that strict parsers reject. The provider must accept such output."""
+    raw = (
+        '{"transcription": ['
+        '{"timestamps": {"from": "00:00:00,000", "to": "00:00:01,000"},'
+        ' "offsets": {"from": 0, "to": 1000},'
+        ' "text": " line one\nline two"}'
+        "]}"
+    )
+    provider = WhisperCppProvider(
+        model_path=tmp_path / "ggml-base.bin",
+        runner=_fixed_runner(raw),
+    )
+    transcript = provider.transcribe(tmp_path / "audio.wav")
+
+    assert len(transcript.segments) == 1
+    assert "line one" in transcript.segments[0].text
+    assert "line two" in transcript.segments[0].text
+
+
 def test_empty_transcription_list_yields_duration_zero(tmp_path: Path) -> None:
     output_dir = tmp_path / "out"
     output_dir.mkdir()

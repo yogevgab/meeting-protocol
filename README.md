@@ -102,7 +102,59 @@ This writes four files to `./outputs/`:
 | `transcript.md` | Speaker-labelled transcript with timestamps |
 | `actions.md` | Standalone action items checklist |
 
-> **Current limitations:** Diarization is not yet implemented. The `mock` backend returns two fixed speakers (`S1=Yogev`, `S2=Tom`). The `whisper-cpp` backend produces segments with no speaker labels — all segments are left without a `speaker_id` until a diarization step is added.
+### Speaker diarization (optional)
+
+The `--diarize` flag adds a "who spoke when" stage that assigns a `speaker_id` to each segment. The current backend is `pyannote.audio` (the academic gold standard, runs locally on Apple Silicon via PyTorch MPS).
+
+**One-time setup** (HuggingFace requires you to accept two model licenses and provide an auth token):
+
+1. Accept the license at <https://huggingface.co/pyannote/speaker-diarization-3.1>
+2. Accept the license at <https://huggingface.co/pyannote/segmentation-3.0>
+3. Create a read token at <https://huggingface.co/settings/tokens>
+4. Install the optional dep and export the token:
+   ```bash
+   pip install -e .[pyannote]
+   export HF_TOKEN=<your-token>
+   ```
+
+**Run with diarization** (and optional rename of anonymous labels):
+
+```bash
+meeting-protocol transcribe ./recording.wav \
+  --provider whisper-cpp \
+  --whisper-cli /opt/homebrew/bin/whisper-cli \
+  --model /path/to/ggml-ivrit-large-v3-turbo.bin \
+  --language he \
+  --diarize \
+  --num-speakers 2 \
+  --speaker-map "SPEAKER_00=Yogev,SPEAKER_01=Tom" \
+  --participants "Yogev,Tom" \
+  --out ./outputs
+```
+
+After a first run, inspect `transcript.md` to see which anonymous label corresponds to which voice, then re-run with `--speaker-map` to put real names on them.
+
+When combined with `--correct`, the LLM corrector receives a `"speaker"` field per segment as read-only context — useful for proper-name disambiguation.
+
+> **Notes.** `--num-speakers` is an *exact* count when set; if you don't know it, leave at `0` (auto) or use `--max-speakers N` as a soft hint. Overlapped speech is collapsed to one dominant speaker per ASR segment.
+
+### LLM correction with Ollama (optional)
+
+Use `--correct` to run a conservative local LLM pass that fixes clear ASR mistakes without summarizing or rewriting the speaker's wording.
+
+The code default is `gemma3:12b`, but on Yogev's Mac the currently installed general-purpose model is `qwen3:14b`. For local Hebrew correction, start with:
+
+```bash
+meeting-protocol transcribe recording.wav \
+  --provider whisper-cpp \
+  --model /path/to/ggml-ivrit-large-v3-turbo.bin \
+  --language he \
+  --correct \
+  --correction-model qwen3:14b \
+  --out outputs
+```
+
+Good comparison candidates are `qwen3:14b`, `gemma4:latest`, and larger Gemma/Qwen models if your Mac has enough free memory. Always inspect `transcript.raw.json` and `transcript.json` side by side: correction should fix ASR errors, not paraphrase the meeting.
 
 ### Generate a protocol from an existing JSON transcript
 
@@ -157,7 +209,8 @@ meeting-protocol/
 │   │   ├── base.py        # TranscriptionProvider ABC
 │   │   ├── mock.py        # MockTranscriptionProvider — fixed fixture segments, no hardware
 │   │   └── whisper_cpp.py # WhisperCppProvider — shells out to whisper-cli, parses JSON output
-│   └── diarization/       # Backend adapters (pluggable, not yet implemented)
+│   ├── diarization/       # Diarizer ABC + PyannoteDiarizer + assignment helpers
+│   └── correction/        # TranscriptCorrector ABC + OllamaCorrector (LLM post-correction)
 ├── fixtures/
 │   └── sample_transcript.json
 └── tests/

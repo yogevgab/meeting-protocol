@@ -48,12 +48,13 @@ class WhisperCppProvider(TranscriptionProvider):
             use_sidecar = not output.strip()
             if not use_sidecar:
                 try:
-                    json.loads(output)
+                    json.loads(output, strict=False)
                 except (json.JSONDecodeError, ValueError):
                     use_sidecar = True
             if use_sidecar and sidecar.exists():
                 output = sidecar.read_text(encoding="utf-8")
-        data = json.loads(output)
+        # strict=False: whisper-cli occasionally embeds raw newlines in transcribed text.
+        data = json.loads(output, strict=False)
         segments: list[Segment] = []
         for i, raw in enumerate(data["transcription"], start=1):
             start = raw["offsets"]["from"] / 1000.0

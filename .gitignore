@@ -10,3 +10,13 @@ htmlcov/
 dist/
 build/
 .DS_Store
+
+# Local/private working outputs. Do not commit real meeting recordings/transcripts.
+outputs/
+.obsidian/
+*.m4a
+*.wav
+*.mp3
+*.aiff
+*.flac
+*.ogg
