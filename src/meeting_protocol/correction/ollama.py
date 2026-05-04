@@ -57,6 +57,7 @@ class OllamaCorrector(TranscriptCorrector):
         runaway_factor: float = 5.0,
         http_client: HttpClient | None = None,
         on_warning: WarningHandler | None = None,
+        think: bool | None = None,
     ) -> None:
         self._model = model
         self._host = host.rstrip("/")
@@ -69,6 +70,7 @@ class OllamaCorrector(TranscriptCorrector):
         self._on_warning: WarningHandler = (
             on_warning if on_warning is not None else (lambda _msg: None)
         )
+        self._think = think
 
     def correct(
         self,
@@ -123,7 +125,7 @@ class OllamaCorrector(TranscriptCorrector):
             participants=self._participants,
             speaker_names=speaker_names,
         )
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._model,
             "stream": False,
             "format": _RESPONSE_SCHEMA,
@@ -131,10 +133,10 @@ class OllamaCorrector(TranscriptCorrector):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            "options": {
-                "temperature": 0.0,
-            },
+            "options": {"temperature": 0.0},
         }
+        if self._think is not None:
+            payload["think"] = self._think
         url = f"{self._host}/api/chat"
         body = self._client(url, payload)
         try:

@@ -115,6 +115,13 @@ def transcribe(
             help="Number of previously-corrected segments to include as context.",
         ),
     ] = 4,
+    correction_think: Annotated[
+        str,
+        typer.Option(
+            "--correction-think",
+            help="Extended thinking: auto (default), true, or false.",
+        ),
+    ] = "auto",
     diarize: Annotated[
         bool,
         typer.Option(
@@ -158,6 +165,14 @@ def transcribe(
     """Transcribe audio and write JSON + Markdown artifacts."""
     if not audio_path.exists():
         typer.echo(f"Error: audio file not found: {audio_path}", err=True)
+        raise typer.Exit(code=1)
+
+    if correction_think not in ("auto", "true", "false"):
+        typer.echo(
+            f"Error: invalid --correction-think value {correction_think!r}. "
+            "Allowed values: auto, true, false.",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     primary_backend = _build_primary_backend(provider, model, whisper_cli, language, out)
@@ -216,6 +231,11 @@ def transcribe(
         save_transcript(ensemble.secondary, out / "transcript.secondary.json")
 
     if correct:
+        _think: bool | None = None
+        if correction_think == "true":
+            _think = True
+        elif correction_think == "false":
+            _think = False
         corrector_obj = _build_corrector(
             corrector,
             correction_model,
@@ -224,6 +244,7 @@ def transcribe(
             correction_overlap,
             title,
             participant_list,
+            _think,
         )
         transcript = corrector_obj.correct(ensemble.primary, ensemble.secondary_texts)
 
@@ -302,6 +323,7 @@ def _build_corrector(
     overlap: int,
     title: str,
     participants: list[str],
+    think: bool | None = None,
 ) -> OllamaCorrector:
     if name != "ollama":
         typer.echo(f"Error: unknown corrector {name!r}. Choose ollama.", err=True)
@@ -314,4 +336,5 @@ def _build_corrector(
         title=title,
         participants=participants,
         on_warning=lambda msg: typer.echo(f"warning: {msg}", err=True),
+        think=think,
     )

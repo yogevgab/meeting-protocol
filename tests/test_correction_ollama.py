@@ -280,3 +280,41 @@ def test_hebrew_round_trip_preserves_unicode() -> None:
     result = corrector.correct(t)
 
     assert result.segments[0].text == "שלום, עולם"
+
+
+# ── think / extended thinking controls ────────────────────────────────────────
+
+
+def test_think_false_puts_think_false_at_top_level() -> None:
+    """think=False must set top-level 'think': False, not inside options."""
+    t = _transcript(_seg(1, "x"))
+    client, calls = _scripted_client([_ok_envelope({1: "X"})])
+    corrector = OllamaCorrector(window=10, overlap=0, http_client=client, think=False)
+
+    corrector.correct(t)
+
+    assert calls[0][1]["think"] is False
+    assert "think" not in calls[0][1]["options"]
+
+
+def test_think_true_puts_think_true_at_top_level() -> None:
+    """think=True must set top-level 'think': True, not inside options."""
+    t = _transcript(_seg(1, "x"))
+    client, calls = _scripted_client([_ok_envelope({1: "X"})])
+    corrector = OllamaCorrector(window=10, overlap=0, http_client=client, think=True)
+
+    corrector.correct(t)
+
+    assert calls[0][1]["think"] is True
+    assert "think" not in calls[0][1]["options"]
+
+
+def test_think_none_omits_think_from_payload() -> None:
+    """Default (think=None) must NOT include top-level 'think' in the payload at all."""
+    t = _transcript(_seg(1, "x"))
+    client, calls = _scripted_client([_ok_envelope({1: "X"})])
+    corrector = OllamaCorrector(window=10, overlap=0, http_client=client)
+
+    corrector.correct(t)
+
+    assert "think" not in calls[0][1]

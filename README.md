@@ -154,7 +154,20 @@ meeting-protocol transcribe recording.wav \
   --out outputs
 ```
 
-Good comparison candidates are `qwen3:14b`, `gemma4:latest`, and larger Gemma/Qwen models if your Mac has enough free memory. Always inspect `transcript.raw.json` and `transcript.json` side by side: correction should fix ASR errors, not paraphrase the meeting.
+Good comparison candidates are `qwen3:14b`, `gemma4:latest`, and larger Gemma/Qwen models if your Mac has enough free memory. For thinking models such as `gemma4:26b`, disable extended thinking during conservative ASR correction:
+
+```bash
+meeting-protocol transcribe recording.wav \
+  --provider whisper-cpp \
+  --model /path/to/ggml-ivrit-large-v3-turbo.bin \
+  --language he \
+  --correct \
+  --correction-model gemma4:26b \
+  --correction-think false \
+  --out outputs
+```
+
+Always inspect `transcript.raw.json` and `transcript.json` side by side: correction should fix ASR errors, not paraphrase the meeting.
 
 ### Generate a protocol from an existing JSON transcript
 

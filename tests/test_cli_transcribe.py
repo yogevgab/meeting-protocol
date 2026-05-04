@@ -592,3 +592,122 @@ def test_transcribe_secondary_model_writes_secondary_json(
     assert (out / "transcript.raw.json").exists()
     assert str(tmp_path / "primary.bin") in received_models
     assert str(tmp_path / "secondary.bin") in received_models
+
+
+# ── --correction-think option ─────────────────────────────────────────────────
+
+
+def test_correction_think_false_passes_think_false_to_corrector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--correction-think false must wire think=False into the OllamaCorrector."""
+    from meeting_protocol.models import Transcript
+
+    captured: dict[str, object] = {}
+
+    class _FakeCorrector:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def correct(self, transcript: Transcript, secondary_texts: object = None) -> Transcript:
+            return transcript
+
+    monkeypatch.setattr("meeting_protocol.cli.main.OllamaCorrector", _FakeCorrector)
+
+    out = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "transcribe", str(_audio(tmp_path)),
+            "--out", str(out),
+            "--provider", "mock",
+            "--correct",
+            "--correction-think", "false",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured.get("think") is False
+
+
+def test_correction_think_true_passes_think_true_to_corrector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--correction-think true must wire think=True into the OllamaCorrector."""
+    from meeting_protocol.models import Transcript
+
+    captured: dict[str, object] = {}
+
+    class _FakeCorrector:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def correct(self, transcript: Transcript, secondary_texts: object = None) -> Transcript:
+            return transcript
+
+    monkeypatch.setattr("meeting_protocol.cli.main.OllamaCorrector", _FakeCorrector)
+
+    out = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "transcribe", str(_audio(tmp_path)),
+            "--out", str(out),
+            "--provider", "mock",
+            "--correct",
+            "--correction-think", "true",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured.get("think") is True
+
+
+def test_correction_think_invalid_value_exits_nonzero_with_helpful_message(
+    tmp_path: Path,
+) -> None:
+    """--correction-think with an unknown value must exit non-zero and name --correction-think."""
+    result = runner.invoke(
+        app,
+        [
+            "transcribe", str(_audio(tmp_path)),
+            "--out", str(tmp_path / "out"),
+            "--provider", "mock",
+            "--correction-think", "maybe",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--correction-think" in result.output
+
+
+def test_correction_think_auto_omits_think_from_corrector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--correction-think auto (default) must pass think=None to OllamaCorrector."""
+    from meeting_protocol.models import Transcript
+
+    captured: dict[str, object] = {}
+
+    class _FakeCorrector:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def correct(self, transcript: Transcript, secondary_texts: object = None) -> Transcript:
+            return transcript
+
+    monkeypatch.setattr("meeting_protocol.cli.main.OllamaCorrector", _FakeCorrector)
+
+    out = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "transcribe", str(_audio(tmp_path)),
+            "--out", str(out),
+            "--provider", "mock",
+            "--correct",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured.get("think") is None
