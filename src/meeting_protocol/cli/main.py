@@ -14,7 +14,8 @@ from meeting_protocol.io import load_transcript, save_transcript
 from meeting_protocol.outputs.markdown import render_actions, render_protocol, render_transcript
 from meeting_protocol.protocol.generator import generate_protocol
 from meeting_protocol.transcription.base import TranscriptionProvider
-from meeting_protocol.transcription.ensemble import transcribe_ensemble
+from meeting_protocol.transcription.ensemble import EnsembleTranscript, transcribe_ensemble
+from meeting_protocol.transcription.merge import merge_transcripts
 from meeting_protocol.transcription.mock import MockTranscriptionProvider
 from meeting_protocol.transcription.whisper_cpp import WhisperCppProvider
 
@@ -30,9 +31,7 @@ def version() -> None:
 @app.command(name="from-transcript")
 def from_transcript(
     transcript_path: Annotated[Path, typer.Argument(help="Path to JSON transcript file.")],
-    out: Annotated[
-        Path, typer.Option("--out", "-o", help="Output directory.")
-    ] = Path("."),
+    out: Annotated[Path, typer.Option("--out", "-o", help="Output directory.")] = Path("."),
     title: Annotated[
         str, typer.Option("--title", "-t", help="Protocol title.")
     ] = "Meeting Protocol",
@@ -53,10 +52,11 @@ def from_transcript(
 
 @app.command()
 def transcribe(
-    audio_path: Annotated[Path, typer.Argument(help="Path to audio file.")],
-    out: Annotated[
-        Path, typer.Option("--out", "-o", help="Output directory.")
-    ] = Path("."),
+    audio_paths: Annotated[
+        list[Path],
+        typer.Argument(help="Path(s) to audio file(s). Pass multiple to merge into one meeting."),
+    ],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Output directory.")] = Path("."),
     provider: Annotated[
         str, typer.Option("--provider", help="Transcription backend: mock or whisper-cpp.")
     ] = "mock",
@@ -163,9 +163,10 @@ def transcribe(
     ] = "",
 ) -> None:
     """Transcribe audio and write JSON + Markdown artifacts."""
-    if not audio_path.exists():
-        typer.echo(f"Error: audio file not found: {audio_path}", err=True)
-        raise typer.Exit(code=1)
+    for _ap in audio_paths:
+        if not _ap.exists():
+            typer.echo(f"Error: audio file not found: {_ap}", err=True)
+            raise typer.Exit(code=1)
 
     if correction_think not in ("auto", "true", "false"):
         typer.echo(
@@ -189,14 +190,38 @@ def transcribe(
         )
 
     out.mkdir(parents=True, exist_ok=True)
-    ensemble = transcribe_ensemble(
-        primary_backend, secondary_backend, audio_path, iou_threshold=alignment_iou
-    )
+
+    per_clip: list[EnsembleTranscript] = [
+        transcribe_ensemble(primary_backend, secondary_backend, path, iou_threshold=alignment_iou)
+        for path in audio_paths
+    ]
+
+    if len(per_clip) == 1:
+        ensemble = per_clip[0]
+    else:
+        merged_primary = merge_transcripts([e.primary for e in per_clip])
+        has_secondary = any(e.secondary is not None for e in per_clip)
+        merged_secondary = (
+            merge_transcripts([e.secondary for e in per_clip if e.secondary is not None])
+            if has_secondary
+            else None
+        )
+        merged_secondary_texts: list[str | None] = []
+        for e in per_clip:
+            merged_secondary_texts.extend(e.secondary_texts)
+        ensemble = EnsembleTranscript(
+            primary=merged_primary,
+            secondary=merged_secondary,
+            secondary_texts=merged_secondary_texts,
+        )
 
     transcript = ensemble.primary
     participant_list = [p.strip() for p in participants.split(",") if p.strip()]
 
     if diarize:
+        if len(audio_paths) > 1:
+            typer.echo("Error: --diarize is not supported with multiple audio files yet.", err=True)
+            raise typer.Exit(code=1)
         try:
             speaker_map_dict = parse_speaker_map(speaker_map)
         except ValueError as e:
@@ -211,7 +236,7 @@ def transcribe(
             participants=participant_list,
         )
         try:
-            intervals = diarizer_obj.diarize(audio_path)
+            intervals = diarizer_obj.diarize(audio_paths[0])
         except (RuntimeError, ImportError) as e:
             typer.echo(f"Error: diarization failed: {e}", err=True)
             raise typer.Exit(code=1) from None

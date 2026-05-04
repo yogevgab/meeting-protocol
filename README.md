@@ -65,6 +65,39 @@ meeting-protocol transcribe recording.mp3 \
   --out ./outputs
 ```
 
+### Transcribing a meeting split across multiple audio files
+
+If a meeting was recorded in parts (e.g. the recorder was paused and restarted, or the session spanned multiple files), pass all files to `transcribe` in one command:
+
+```bash
+meeting-protocol transcribe part1.m4a part2.m4a part3.m4a \
+  --provider whisper-cpp \
+  --model ~/.cache/whisper-models/ivrit-large-v3-turbo/ggml-model.bin \
+  --language he \
+  --title "Weekly Sync" \
+  --participants "Yogev,Tom" \
+  --out ./outputs
+```
+
+Files are processed in the order given. Timestamps from each subsequent file are offset so the full timeline is continuous — the result is a single merged transcript as if it were one recording. The usual four output files (`transcript.json`, `protocol.md`, `transcript.md`, `actions.md`) are produced for the combined session.
+
+**Current limitation — diarization with multiple files is not yet supported.** If you pass `--diarize` together with multiple audio files the command will exit with an error. Workaround: concatenate the files into one before running:
+
+```bash
+ffmpeg -i "concat:part1.m4a|part2.m4a|part3.m4a" -c copy combined.m4a
+meeting-protocol transcribe combined.m4a --diarize ...
+```
+
+Or convert each part to WAV and join them:
+
+```bash
+for f in part1.m4a part2.m4a part3.m4a; do
+  ffmpeg -i "$f" -ar 16000 -ac 1 "${f%.m4a}.wav"
+done
+sox part1.wav part2.wav part3.wav combined.wav
+meeting-protocol transcribe combined.wav --diarize ...
+```
+
 ### Hebrew transcription (Ivrit model)
 
 For Hebrew or Hebrew/English mixed recordings, use the **ivrit-ai/whisper-large-v3-turbo-ggml** model and pass `--language he`. The `--language` flag defaults to `auto` (whisper.cpp language detection), but language detection can mis-classify Hebrew — always specify it explicitly for Hebrew recordings.
